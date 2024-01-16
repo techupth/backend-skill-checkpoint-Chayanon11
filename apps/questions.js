@@ -3,11 +3,11 @@ import { db } from "../utils/db.js";
 import { ObjectId } from "mongodb";
 
 const questionRouter = Router();
+const collection = db.collection("questions");
 
 // Get all questions
-questionRouter.get("/questions", async (req, res) => {
+questionRouter.get("/", async (req, res) => {
   try {
-    const collection = db.collection("questions");
     const allQuestions = await collection.find().toArray();
     return res.json({
       message: "Questions retrieved successfully",
@@ -21,11 +21,14 @@ questionRouter.get("/questions", async (req, res) => {
 });
 
 // Get a specific question by ID
-questionRouter.get("/questions/:id", async (req, res) => {
+questionRouter.get("/:id", async (req, res) => {
   try {
+    // รับ collection จาก MongoDB client
     const collection = db.collection("questions");
+
     const questionId = new ObjectId(req.params.id);
 
+    // ใช้ findOne ในการค้นหาข้อมูล
     const questionById = await collection.findOne({ _id: questionId });
 
     return res.json({
@@ -33,47 +36,32 @@ questionRouter.get("/questions/:id", async (req, res) => {
       question: questionById,
     });
   } catch (error) {
-    return res.json({
-      message: `${error}`,
+    return res.status(500).json({
+      message: `Error retrieving question: ${error}`,
     });
   }
 });
 
-// Create a new question
-questionRouter.post("/questions", async (req, res) => {
+questionRouter.post("/", async (req, res) => {
   try {
     const collection = db.collection("questions");
-    const { title, description, category } = req.body;
+    const questionData = { ...req.body, created_at: new Date() };
 
-    if (!title || !description || !category) {
-      return res
-        .status(400)
-        .json({ error: "Please provide title, description, and category" });
-    }
-
-    const newQuestionData = {
-      title,
-      description,
-      category,
-    };
-
-    const newQuestion = await collection.insertOne(newQuestionData);
+    const newQuestionData = await collection.insertOne(questionData);
 
     return res.status(201).json({
-      message: "Question created successfully",
-      question: newQuestion.ops[0],
+      message: `Question Id ${newQuestionData.insertedId} has been created successfully`,
     });
   } catch (error) {
-    return res.json({
-      message: `${error}`,
+    return res.status(500).json({
+      message: `Error creating question: ${error}`,
     });
   }
 });
 
 // Update a question by ID
-questionRouter.put("/questions/:id", async (req, res) => {
+questionRouter.put("/:id", async (req, res) => {
   try {
-    const collection = db.collection("questions");
     const { title, description } = req.body;
 
     if (!title || !description) {
@@ -105,17 +93,24 @@ questionRouter.put("/questions/:id", async (req, res) => {
 });
 
 // Delete a question by ID
-questionRouter.delete("/questions/:id", async (req, res) => {
+questionRouter.delete("/:id", async (req, res) => {
   try {
+    // รับ collection จาก MongoDB client
     const collection = db.collection("questions");
+
     const questionId = new ObjectId(req.params.id);
 
-    await collection.deleteOne({ _id: questionId });
+    // ใช้ deleteOne ในการลบข้อมูล
+    const result = await collection.deleteOne({ _id: questionId });
 
-    return res.json({ message: "Question deleted successfully" });
+    if (result.deletedCount === 1) {
+      return res.json({ message: "Question deleted successfully" });
+    } else {
+      return res.status(404).json({ message: "Question not found" });
+    }
   } catch (error) {
-    return res.json({
-      message: `${error}`,
+    return res.status(500).json({
+      message: `Error deleting question: ${error}`,
     });
   }
 });
