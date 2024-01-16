@@ -1,11 +1,11 @@
 import express from "express";
 import { client } from "./utils/db.js";
+import { ObjectId } from "mongodb";
 
-async function init() {
+const init = async () => {
+  await client.connect();
   const app = express();
   const port = 4000;
-
-  await client.connect();
 
   app.use(express.json());
   app.use(express.urlencoded({ extended: true }));
@@ -14,9 +14,14 @@ async function init() {
   let questions = [];
 
   // Middleware to check if question exists by ID
-  const questionExists = (req, res, next) => {
+  const questionExists = async (req, res, next) => {
     const questionId = req.params.id;
-    const question = questions.find((q) => q.id === questionId);
+
+    // Replace the mock data check with MongoDB query
+    const collection = client.db("practice-mongo").collection("questions");
+    const question = await collection.findOne({
+      _id: new ObjectId(questionId),
+    });
 
     if (!question) {
       return res.status(404).json({ error: "Question not found" });
@@ -28,13 +33,14 @@ async function init() {
 
   // Generate unique ID for questions
   const generateQuestionId = () => {
-    return Date.now().toString(36) + Math.random().toString(36);
+    return new ObjectId().toString();
   };
 
-  // Routes
+  // Create Express Router for questions
+  const questionRouter = express.Router();
 
   // Create a new question
-  app.post("/questions", (req, res) => {
+  questionRouter.post("/", async (req, res) => {
     const { title, description, category } = req.body;
 
     if (!title || !description || !category) {
@@ -43,14 +49,16 @@ async function init() {
         .json({ error: "Please provide title, description, and category" });
     }
 
+    const collection = client.db("practice-mongo").collection("questions");
+
     const newQuestion = {
-      id: generateQuestionId(),
+      _id: new ObjectId(),
       title,
       description,
       category,
     };
 
-    questions.push(newQuestion);
+    await collection.insertOne(newQuestion);
 
     return res.status(201).json({
       message: "Question created successfully",
@@ -59,15 +67,17 @@ async function init() {
   });
 
   // Get all questions
-  app.get("/questions", (req, res) => {
+  questionRouter.get("/", async (req, res) => {
+    const collection = client.db("practice-mongo").collection("questions");
+    const allQuestions = await collection.find().toArray();
     return res.json({
       message: "Questions retrieved successfully",
-      questions: questions,
+      questions: allQuestions,
     });
   });
 
   // Get a specific question by ID
-  app.get("/questions/:id", questionExists, (req, res) => {
+  questionRouter.get("/:id", questionExists, (req, res) => {
     return res.json({
       message: "Question retrieved successfully",
       question: req.question,
@@ -75,7 +85,7 @@ async function init() {
   });
 
   // Update a question by ID
-  app.put("/questions/:id", questionExists, (req, res) => {
+  questionRouter.put("/:id", questionExists, async (req, res) => {
     const { title, description } = req.body;
 
     if (!title || !description) {
@@ -84,21 +94,29 @@ async function init() {
         .json({ error: "Please provide title and description for update" });
     }
 
-    req.question.title = title;
-    req.question.description = description;
+    const collection = client.db("practice-mongo").collection("questions");
+
+    await collection.updateOne(
+      { _id: new ObjectId(req.params.id) },
+      { $set: { title, description } }
+    );
 
     return res.json({
       message: "Question updated successfully",
-      updatedQuestion: req.question,
     });
   });
 
   // Delete a question by ID
-  app.delete("/questions/:id", questionExists, (req, res) => {
-    questions = questions.filter((q) => q.id !== req.question.id);
+  questionRouter.delete("/:id", questionExists, async (req, res) => {
+    const collection = client.db("practice-mongo").collection("questions");
+
+    await collection.deleteOne({ _id: new ObjectId(req.params.id) });
 
     return res.json({ message: "Question deleted successfully" });
   });
+
+  // Mount the questionRouter at the "/questions" endpoint
+  app.use("/questions", questionRouter);
 
   // Default route for handling unknown paths
   app.get("*", (req, res) => {
@@ -109,6 +127,6 @@ async function init() {
   app.listen(port, () => {
     console.log(`Server is listening on port ${port}`);
   });
-}
+};
 
 init();
