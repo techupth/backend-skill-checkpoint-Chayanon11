@@ -3,6 +3,7 @@ import { db } from "../utils/db.js";
 import { ObjectId } from "mongodb";
 
 const questionRouter = Router();
+// รับ collection จาก MongoDB client
 const collection = db.collection("questions");
 
 // Get all questions
@@ -23,9 +24,6 @@ questionRouter.get("/", async (req, res) => {
 // Get a specific question by ID
 questionRouter.get("/:id", async (req, res) => {
   try {
-    // รับ collection จาก MongoDB client
-    const collection = db.collection("questions");
-
     const questionId = new ObjectId(req.params.id);
 
     // ใช้ findOne ในการค้นหาข้อมูล
@@ -44,7 +42,6 @@ questionRouter.get("/:id", async (req, res) => {
 
 questionRouter.post("/", async (req, res) => {
   try {
-    const collection = db.collection("questions");
     const questionData = { ...req.body, created_at: new Date() };
 
     const newQuestionData = await collection.insertOne(questionData);
@@ -95,9 +92,6 @@ questionRouter.put("/:id", async (req, res) => {
 // Delete a question by ID
 questionRouter.delete("/:id", async (req, res) => {
   try {
-    // รับ collection จาก MongoDB client
-    const collection = db.collection("questions");
-
     const questionId = new ObjectId(req.params.id);
 
     // ใช้ deleteOne ในการลบข้อมูล
